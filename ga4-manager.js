@@ -10,7 +10,7 @@ class GA4Manager {
     // Initialize Google API when page loads
     gapi.load('auth2', () => {
       gapi.auth2.init({
-        client_id: 'YOUR_CLIENT_ID', // Replace with your actual client ID
+        client_id: '903553466558-ggf600mr9qauuimpfmc0olc94dledr2n.apps.googleusercontent.com', // Replace with your actual client ID
         scope: 'https://www.googleapis.com/auth/analytics.edit'
       }).then(() => {
         const authInstance = gapi.auth2.getAuthInstance();
