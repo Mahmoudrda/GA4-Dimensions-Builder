@@ -1,44 +1,65 @@
-// GA4 Custom Dimensions Manager - Standalone JavaScript
+// GA4 Custom Dimensions Manager - Updated for Google Identity Services
 class GA4Manager {
   constructor() {
     this.accessToken = null;
     this.isAuthenticated = false;
+    this.tokenClient = null;
     this.init();
   }
 
   init() {
-    // Initialize Google API when page loads
-    gapi.load('auth2', () => {
-      gapi.auth2.init({
-        client_id: '903553466558-ggf600mr9qauuimpfmc0olc94dledr2n.apps.googleusercontent.com', // Replace with your actual client ID
-        scope: 'https://www.googleapis.com/auth/analytics.edit'
-      }).then(() => {
-        const authInstance = gapi.auth2.getAuthInstance();
-        if (authInstance.isSignedIn.get()) {
-          this.handleAuthSuccess(authInstance.currentUser.get());
-        }
+    // Load Google API client and Google Identity Services
+    gapi.load('client', () => {
+      gapi.client.init({
+        apiKey: '', // Leave empty for OAuth-only access
+        discoveryDocs: ['https://analyticsadmin.googleapis.com/$discovery/rest?version=v1beta']
       });
+    });
+
+    // Initialize Google Identity Services
+    google.accounts.id.initialize({
+      client_id: '903553466558-ggf600mr9qauuimpfmc0olc94dledr2n.apps.googleusercontent.com'
+    });
+
+    // Create token client for OAuth
+    this.tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: '903553466558-ggf600mr9qauuimpfmc0olc94dledr2n.apps.googleusercontent.com',
+      scope: 'https://www.googleapis.com/auth/analytics.edit',
+      callback: (response) => {
+        if (response.error !== undefined) {
+          throw new Error(response.error);
+        }
+        this.handleAuthSuccess(response);
+      },
     });
   }
 
   async authenticate() {
-    const authInstance = gapi.auth2.getAuthInstance();
     try {
-      const user = await authInstance.signIn();
-      this.handleAuthSuccess(user);
+      // Request access token
+      this.tokenClient.requestAccessToken({prompt: 'consent'});
     } catch (error) {
-      throw new Error('Authentication failed');
+      console.error('Authentication failed:', error);
+      throw new Error('Authentication failed: ' + error.message);
     }
   }
 
-  handleAuthSuccess(user) {
+  handleAuthSuccess(response) {
     this.isAuthenticated = true;
-    this.accessToken = user.getAuthResponse().access_token;
+    this.accessToken = response.access_token;
+    
+    // Update UI to show authenticated state
+    const authBtn = document.getElementById('loadPropsBtn');
+    if (authBtn && authBtn.textContent === 'Load My GA4 Properties') {
+      authBtn.textContent = 'Authenticated - Click to Load Properties';
+      authBtn.style.background = 'linear-gradient(135deg, #43a047 0%, #2e7d32 100%)';
+    }
   }
 
   async makeApiCall(url, options = {}) {
     if (!this.accessToken) {
       await this.authenticate();
+      return; // Exit here, callback will handle the next steps
     }
 
     const defaultOptions = {
@@ -48,8 +69,24 @@ class GA4Manager {
       }
     };
 
-    const response = await fetch(url, { ...defaultOptions, ...options });
-    return response.json();
+    try {
+      const response = await fetch(url, { ...defaultOptions, ...options });
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          // Token expired, re-authenticate
+          this.accessToken = null;
+          this.isAuthenticated = false;
+          throw new Error('Authentication expired. Please try again.');
+        }
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.error('API call failed:', error);
+      throw error;
+    }
   }
 }
 
@@ -72,6 +109,12 @@ function switchTab(tabName) {
 
 // Property management
 async function loadProperties() {
+  if (!ga4Manager.isAuthenticated) {
+    // First authenticate, then the callback will handle loading properties
+    await ga4Manager.authenticate();
+    return;
+  }
+
   document.getElementById('propertyLoader').style.display = 'block';
   document.getElementById('loadPropsBtn').disabled = true;
   
@@ -85,10 +128,6 @@ async function loadProperties() {
 
 async function getPropertiesList() {
   try {
-    if (!ga4Manager.isAuthenticated) {
-      await ga4Manager.authenticate();
-    }
-
     const accountsUrl = "https://analyticsadmin.googleapis.com/v1beta/accounts";
     const accountsData = await ga4Manager.makeApiCall(accountsUrl);
     const accounts = accountsData.accounts || [];
