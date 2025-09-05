@@ -17,8 +17,6 @@ A web-based tool for creating and managing custom dimensions across multiple Goo
 
 - Google Cloud Console project with Analytics Admin API enabled
 - Admin or Editor access to GA4 properties you want to manage
-- Modern web browser with ES6+ support
-- HTTPS hosting for production deployments
 
 ## Setup Instructions
 
