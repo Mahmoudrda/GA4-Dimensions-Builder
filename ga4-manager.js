@@ -1,4 +1,3 @@
-// GA4 Custom Dimensions Manager - Updated for Google Identity Services
 class GA4Manager {
   constructor() {
     this.accessToken = null;
@@ -8,20 +7,17 @@ class GA4Manager {
   }
 
   init() {
-    // Load Google API client and Google Identity Services
     gapi.load('client', () => {
       gapi.client.init({
-        apiKey: '', // Leave empty for OAuth-only access
+        apiKey: '', 
         discoveryDocs: ['https://analyticsadmin.googleapis.com/$discovery/rest?version=v1beta']
       });
     });
 
-    // Initialize Google Identity Services
     google.accounts.id.initialize({
       client_id: '903553466558-ggf600mr9qauuimpfmc0olc94dledr2n.apps.googleusercontent.com'
     });
 
-    // Create token client for OAuth
     this.tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: '903553466558-ggf600mr9qauuimpfmc0olc94dledr2n.apps.googleusercontent.com',
       scope: 'https://www.googleapis.com/auth/analytics.edit',
@@ -90,7 +86,6 @@ class GA4Manager {
   }
 }
 
-// Initialize the manager
 const ga4Manager = new GA4Manager();
 
 // Global variables to maintain compatibility with your HTML
@@ -98,7 +93,6 @@ let selectedPropertyId = null;
 let dimensions = [];
 let existingDimensions = [];
 
-// Tab switching
 function switchTab(tabName) {
   document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
@@ -107,7 +101,6 @@ function switchTab(tabName) {
   document.getElementById(tabName + '-tab').classList.add('active');
 }
 
-// Property management
 async function loadProperties() {
   if (!ga4Manager.isAuthenticated) {
     // First authenticate, then the callback will handle loading properties
@@ -167,7 +160,6 @@ function handlePropertiesLoaded(result) {
     const select = document.getElementById('propertySelect');
     select.innerHTML = '<option value="">Select a GA4 Property...</option>';
     
-    // Group by account
     const accountGroups = {};
     result.properties.forEach(prop => {
       if (!accountGroups[prop.accountName]) {
@@ -254,7 +246,6 @@ function displayExistingDimensions() {
   }
 }
 
-// Manual dimension entry
 function addManualDimension() {
   const displayName = document.getElementById('manualDisplayName').value.trim();
   const parameterName = document.getElementById('manualParameterName').value.trim();
@@ -276,7 +267,6 @@ function addManualDimension() {
 
   dimensions.push(dimension);
   
-  // Clear form
   document.getElementById('manualDisplayName').value = '';
   document.getElementById('manualParameterName').value = '';
   document.getElementById('manualDescription').value = '';
@@ -317,7 +307,6 @@ function generateSample() {
   showSuccess('Added 3 sample dimensions');
 }
 
-// File handling
 function handleDragOver(event) {
   event.preventDefault();
   event.currentTarget.classList.add('dragover');
@@ -507,7 +496,6 @@ function generateSampleTemplate(format) {
   }
 }
 
-// Dimension management
 function updateDimensionList() {
   const container = document.getElementById('dimensionList');
   const count = document.getElementById('dimensionCount');
@@ -597,7 +585,6 @@ function validateDimensions(dimensions) {
   return { errors, warnings };
 }
 
-// Creation process
 function updateCreateButton() {
   const createBtn = document.getElementById('createBtn');
   createBtn.disabled = !selectedPropertyId || dimensions.length === 0;
@@ -788,7 +775,6 @@ function displayResults(result) {
   resultsDiv.style.display = 'block';
 }
 
-// Utility functions
 function showError(message) {
   const resultsDiv = document.getElementById('results');
   resultsDiv.innerHTML = `<div class="results"><div class="results-header"><p class="error"><strong>Error:</strong> ${message}</p></div></div>`;
