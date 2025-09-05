@@ -7,7 +7,6 @@ A web-based tool for creating and managing custom dimensions across multiple Goo
 - **OAuth 2.0 Authentication** - Secure login with Google Analytics Admin API access
 - **Property Management** - Load and select from all GA4 properties you have access to
 - **Multiple Input Methods** - Manual entry and CSV file upload
-- **Batch Processing** - Create multiple dimensions with configurable batch sizes and delays
 - **Duplicate Detection** - Automatically check for existing dimensions to prevent conflicts
 - **Validation** - Real-time validation of dimension parameters
 - **Progress Tracking** - Visual feedback during bulk operations
