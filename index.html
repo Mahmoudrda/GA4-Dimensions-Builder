@@ -15,6 +15,71 @@
 
   <!-- Link to external CSS -->
   <link rel="stylesheet" href="style.css">
+  
+  <style>
+    /* Additional styles for multi-property support */
+    .property-existing {
+      margin: 10px 0;
+      padding: 10px;
+      border: 1px solid #ffe0b2;
+      border-radius: 5px;
+      background: white;
+    }
+    
+    .property-existing h5 {
+      margin: 0 0 5px 0;
+      color: #e37400;
+      font-size: 14px;
+    }
+    
+    .property-results {
+      margin: 20px 0;
+      padding: 15px;
+      border: 1px solid #ffe0b2;
+      border-radius: 8px;
+      background: #fffde7;
+    }
+    
+    .property-results h4 {
+      margin: 0 0 10px 0;
+      color: #e37400;
+      font-size: 16px;
+    }
+    
+    #selectedPropertiesDisplay {
+      background: #fff8e1;
+      border: 1px solid #ffe0b2;
+      border-radius: 8px;
+      padding: 15px;
+      margin: 15px 0;
+    }
+    
+    #propertySelect {
+      min-height: 120px;
+    }
+    
+    .unified-csv-info {
+      background: #e3f2fd;
+      border: 1px solid #2196f3;
+      border-radius: 8px;
+      padding: 15px;
+      margin: 15px 0;
+    }
+    
+    .unified-csv-info h4 {
+      margin: 0 0 10px 0;
+      color: #1976d2;
+    }
+    
+    .unified-csv-info ul {
+      margin: 10px 0;
+      padding-left: 20px;
+    }
+    
+    .unified-csv-info li {
+      margin: 5px 0;
+    }
+  </style>
 </head>
 <body>
   <!-- Google Tag Manager (noscript) -->
@@ -25,13 +90,13 @@
   <div class="container">
     <div class="header">
       <h1>GA4 Custom Dimensions & Metrics Manager</h1>
-      <p>Create and manage custom dimensions and metrics across multiple GA4 properties</p>
+      <p>Create and manage custom dimensions and metrics across multiple GA4 properties (up to 3 at once)</p>
     </div>
     
     <div class="content">
       <!-- Step 1: Property Selection -->
       <div class="step">
-        <h3><span class="step-number">1</span>Select GA4 Property</h3>
+        <h3><span class="step-number">1</span>Select GA4 Properties (Max 3)</h3>
         <div class="form-group">
           <button onclick="loadProperties()" id="loadPropsBtn">Load My GA4 Properties</button>
           <div id="propertyLoader" style="display: none;">
@@ -39,10 +104,12 @@
           </div>
         </div>
         <div class="form-group">
-          <select id="propertySelect" style="display: none;" onchange="onPropertyChange()">
-            <option value="">Select a GA4 Property...</option>
+          <select id="propertySelect" style="display: none;" onchange="onPropertyChange()" multiple>
+            <option value="">Select GA4 Properties...</option>
           </select>
+          <small style="color: #666;">Hold Ctrl (Windows) or Cmd (Mac) to select multiple properties. Maximum 3 properties allowed.</small>
         </div>
+        <div id="selectedPropertiesDisplay" style="display: none;"></div>
         <div id="existingDimensions" style="display: none;"></div>
         <div id="existingMetrics" style="display: none;"></div>
       </div>
@@ -60,7 +127,7 @@
         <div id="dimensions-main-tab" class="main-tab-content active">
           <div class="tabs">
             <button class="tab active" onclick="switchTab(event, 'manual')">Manual Entry</button>
-            <button class="tab" onclick="switchTab(event, 'csv')">CSV Upload</button>
+            <button class="tab" onclick="switchTab(event, 'csv')">Unified CSV Upload</button>
           </div>
 
           <!-- Manual Entry -->
@@ -93,12 +160,24 @@
 
           <!-- CSV Upload -->
           <div id="csv-tab" class="tab-content">
+            <div class="unified-csv-info">
+              <h4>📄 Unified CSV Format</h4>
+              <p>Upload one CSV file that can create both dimensions and metrics. Required columns:</p>
+              <ul>
+                <li><strong>Key</strong> - Parameter name (e.g., "user_type")</li>
+                <li><strong>Name</strong> - Display name (e.g., "User Type")</li>
+                <li><strong>Notes/Description</strong> - Description text</li>
+                <li><strong>Page-Level</strong> - TRUE for EVENT scope, FALSE for USER scope</li>
+                <li><strong>GA4 Custom Dimension</strong> - TRUE to create as dimension</li>
+                <li><strong>GA4 Custom Metric</strong> - TRUE to create as metric</li>
+              </ul>
+            </div>
             <div class="file-drop" onclick="document.getElementById('csvFile').click()" ondrop="handleFileDrop(event)" ondragover="handleDragOver(event)">
-              <p><strong>Click to upload or drag & drop your CSV file</strong></p>
-              <p>Supported columns: Display Name, Parameter Name, Description, Scope, GA4 Custom Dimension Checkbox</p>
+              <p><strong>Click to upload or drag & drop your unified CSV file</strong></p>
+              <p>The CSV can contain both dimensions and metrics in one file</p>
             </div>
             <input type="file" id="csvFile" accept=".csv" style="display: none;" onchange="handleFileSelect(event, 'csv')">
-            <button onclick="downloadTemplate('csv')" class="btn-secondary btn-small">Download CSV Template</button>
+            <button onclick="downloadTemplate('csv')" class="btn-secondary btn-small">Download Unified CSV Template</button>
           </div>
 
           <!-- Review Dimensions -->
@@ -118,7 +197,7 @@
         <div id="metrics-main-tab" class="main-tab-content">
           <div class="tabs">
             <button class="tab active" onclick="switchTab(event, 'metric-manual')">Manual Entry</button>
-            <button class="tab" onclick="switchTab(event, 'metric-csv')">CSV Upload</button>
+            <button class="tab" onclick="switchTab(event, 'metric-csv')">Unified CSV Upload</button>
           </div>
 
           <!-- Manual Entry -->
@@ -158,12 +237,24 @@
 
           <!-- CSV Upload -->
           <div id="metric-csv-tab" class="tab-content">
+            <div class="unified-csv-info">
+              <h4>📄 Unified CSV Format</h4>
+              <p>Upload one CSV file that can create both dimensions and metrics. Required columns:</p>
+              <ul>
+                <li><strong>Key</strong> - Parameter name (e.g., "revenue_per_user")</li>
+                <li><strong>Name</strong> - Display name (e.g., "Revenue Per User")</li>
+                <li><strong>Notes/Description</strong> - Description text</li>
+                <li><strong>Page-Level</strong> - TRUE for EVENT scope (always TRUE for metrics)</li>
+                <li><strong>GA4 Custom Dimension</strong> - TRUE to create as dimension</li>
+                <li><strong>GA4 Custom Metric</strong> - TRUE to create as metric</li>
+              </ul>
+            </div>
             <div class="file-drop" onclick="document.getElementById('metricCsvFile').click()" ondrop="handleFileDrop(event)" ondragover="handleDragOver(event)">
-              <p><strong>Click to upload or drag & drop your CSV file</strong></p>
-              <p>Supported columns: Display Name, Parameter Name, Description, Measurement Unit, GA4 Custom Metric Checkbox</p>
+              <p><strong>Click to upload or drag & drop your unified CSV file</strong></p>
+              <p>The CSV can contain both dimensions and metrics in one file</p>
             </div>
             <input type="file" id="metricCsvFile" accept=".csv" style="display: none;" onchange="handleFileSelect(event, 'csv')">
-            <button onclick="downloadTemplate('csv')" class="btn-secondary btn-small">Download Metric CSV Template</button>
+            <button onclick="downloadTemplate('csv')" class="btn-secondary btn-small">Download Unified CSV Template</button>
           </div>
 
           <!-- Review Metrics -->
@@ -225,7 +316,9 @@
   <script src="ga4-manager.js"></script>
 
   <script>
+  // Enhanced UI functions with logging
   function switchMainTab(event, tabName) {
+    console.log('switchMainTab: Switching main tab to:', tabName);
     document.querySelectorAll('.main-tab').forEach(tab => tab.classList.remove('active'));
     document.querySelectorAll('.main-tab-content').forEach(content => content.classList.remove('active'));
 
@@ -233,35 +326,22 @@
     document.getElementById(tabName + '-main-tab').classList.add('active');
 
     currentTab = tabName; // 'dimensions' or 'metrics'
+    console.log('switchMainTab: Current tab set to:', currentTab);
     updateCreateButton();
   }
 
   function switchTab(event, tabName) {
+    console.log('switchTab: Switching sub-tab to:', tabName);
     document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
     event.target.classList.add('active');
     document.getElementById(tabName + '-tab').classList.add('active');
   }
 
-  // Override updateCreateButton to handle dynamic text
-  function updateCreateButton() {
-    const createBtn = document.getElementById('createBtn');
-    const sectionTitle = document.getElementById('createSectionTitle');
-    const processText = document.getElementById('processText');
-
-    const itemsCount = currentTab === 'dimensions' ? dimensions.length : metrics.length;
-    createBtn.disabled = !selectedPropertyId || itemsCount === 0;
-
-    if (currentTab === 'dimensions') {
-      createBtn.textContent = `Create ${itemsCount} Custom Dimensions`;
-      sectionTitle.textContent = "Create Custom Dimensions";
-      processText.textContent = "Creating custom dimensions...";
-    } else {
-      createBtn.textContent = `Create ${itemsCount} Custom Metrics`;
-      sectionTitle.textContent = "Create Custom Metrics";
-      processText.textContent = "Creating custom metrics...";
-    }
-  }
+  // Initialize logging
+  console.log('Enhanced GA4 Manager: Application loaded with comprehensive logging');
+  console.log('Enhanced GA4 Manager: Multi-property support enabled (max 3 properties)');
+  console.log('Enhanced GA4 Manager: Unified CSV format implemented');
   </script>
 </body>
 </html>
