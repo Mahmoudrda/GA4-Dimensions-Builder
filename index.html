@@ -12,10 +12,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GA4 Custom Dimensions & Metrics Manager</title>
+
+  <!-- Link to external CSS -->
   <link rel="stylesheet" href="style.css">
-  <style>
-    /* --- styles unchanged from your version --- */
-  </style>
 </head>
 <body>
   <!-- Google Tag Manager (noscript) -->
@@ -30,7 +29,7 @@
     </div>
     
     <div class="content">
-      <!-- Property Selection -->
+      <!-- Step 1: Property Selection -->
       <div class="step">
         <h3><span class="step-number">1</span>Select GA4 Property</h3>
         <div class="form-group">
@@ -48,7 +47,7 @@
         <div id="existingMetrics" style="display: none;"></div>
       </div>
 
-      <!-- Main Tabs for Dimensions vs Metrics -->
+      <!-- Step 2: Choose Type -->
       <div class="step">
         <h3><span class="step-number">2</span>Choose Type</h3>
         
@@ -57,9 +56,8 @@
           <button class="main-tab" onclick="switchMainTab(event, 'metrics')">Custom Metrics</button>
         </div>
 
-        <!-- DIMENSIONS TAB CONTENT -->
+        <!-- DIMENSIONS TAB -->
         <div id="dimensions-main-tab" class="main-tab-content active">
-          <!-- Input Method Tabs -->
           <div class="tabs">
             <button class="tab active" onclick="switchTab(event, 'manual')">Manual Entry</button>
             <button class="tab" onclick="switchTab(event, 'csv')">CSV Upload</button>
@@ -102,8 +100,6 @@
             <input type="file" id="csvFile" accept=".csv" style="display: none;" onchange="handleFileSelect(event, 'csv')">
             <button onclick="downloadTemplate('csv')" class="btn-secondary btn-small">Download CSV Template</button>
           </div>
-          
-          <div id="filePreview"></div>
 
           <!-- Review Dimensions -->
           <div class="step">
@@ -116,36 +112,10 @@
               <button onclick="clearAllDimensions()" class="btn-secondary btn-small">Clear All</button>
             </div>
           </div>
-
-          <!-- Options -->
-          <div class="step">
-            <h3><span class="step-number">4</span>Options</h3>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
-              <div class="form-group">
-                <label><input type="checkbox" id="checkDuplicates" checked> Check for duplicates</label>
-              </div>
-              <div class="form-group">
-                <label>Batch Size: <input type="number" id="batchSize" value="10" min="1" max="50" style="width: 80px;"></label>
-              </div>
-              <div class="form-group">
-                <label>Delay (ms): <input type="number" id="delay" value="1000" min="100" max="5000" style="width: 100px;"></label>
-              </div>
-            </div>
-          </div>
-
-          <!-- Create Button -->
-          <div class="step">
-            <h3><span class="step-number">5</span>Create Custom Dimensions</h3>
-            <button id="createBtn" onclick="createAllDimensions()" disabled>Create Custom Dimensions</button>
-            <div id="processLoader" style="display: none; margin-top: 15px;">
-              <div class="loading"></div> Creating custom dimensions...
-            </div>
-          </div>
         </div>
 
-        <!-- METRICS TAB CONTENT -->
+        <!-- METRICS TAB -->
         <div id="metrics-main-tab" class="main-tab-content">
-          <!-- Input Method Tabs -->
           <div class="tabs">
             <button class="tab active" onclick="switchTab(event, 'metric-manual')">Manual Entry</button>
             <button class="tab" onclick="switchTab(event, 'metric-csv')">CSV Upload</button>
@@ -195,8 +165,6 @@
             <input type="file" id="metricCsvFile" accept=".csv" style="display: none;" onchange="handleFileSelect(event, 'csv')">
             <button onclick="downloadTemplate('csv')" class="btn-secondary btn-small">Download Metric CSV Template</button>
           </div>
-          
-          <div id="metricFilePreview"></div>
 
           <!-- Review Metrics -->
           <div class="step">
@@ -209,38 +177,22 @@
               <button onclick="clearAllMetrics()" class="btn-secondary btn-small">Clear All</button>
             </div>
           </div>
+        </div>
+      </div>
 
-          <!-- Options -->
-          <div class="step">
-            <h3><span class="step-number">4</span>Options</h3>
-            <!-- reusing same IDs so ga4-manager.js can read them -->
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
-              <div class="form-group">
-                <label><input type="checkbox" id="checkDuplicates" checked> Check for duplicates</label>
-              </div>
-              <div class="form-group">
-                <label>Batch Size: <input type="number" id="batchSize" value="10" min="1" max="50" style="width: 80px;"></label>
-              </div>
-              <div class="form-group">
-                <label>Delay (ms): <input type="number" id="delay" value="1000" min="100" max="5000" style="width: 100px;"></label>
-              </div>
-            </div>
-          </div>
-
-          <!-- Create Button -->
-          <!-- Shared Create Button -->
-          <div class="step">
-            <h3><span class="step-number">5</span>
-              <span id="createSectionTitle">Create Custom Dimensions</span>
-            </h3>
-            <button id="createBtn" onclick="createAllDimensions()" disabled>
-              Create Custom Dimensions
-            </button>
-            <div id="processLoader" style="display: none; margin-top: 15px;">
-              <div class="loading"></div>
-              <span id="processText">Creating custom dimensions...</span>
-            </div>
-          </div>
+      <!-- Step 5: Shared Create Button -->
+      <div class="step">
+        <h3><span class="step-number">5</span>
+          <span id="createSectionTitle">Create Custom Dimensions</span>
+        </h3>
+        <button id="createBtn" onclick="createAllDimensions()" disabled>
+          Create Custom Dimensions
+        </button>
+        <div id="processLoader" style="display: none; margin-top: 15px;">
+          <div class="loading"></div>
+          <span id="processText">Creating custom dimensions...</span>
+        </div>
+      </div>
 
       <!-- Results -->
       <div id="results" style="display: none;"></div>
@@ -253,26 +205,42 @@
   <script src="ga4-manager.js"></script>
 
   <script>
-  // Fixed version of switchMainTab and switchTab
   function switchMainTab(event, tabName) {
-  // remove active from all tabs
-  document.querySelectorAll('.main-tab').forEach(tab => tab.classList.remove('active'));
-  document.querySelectorAll('.main-tab-content').forEach(content => content.classList.remove('active'));
+    document.querySelectorAll('.main-tab').forEach(tab => tab.classList.remove('active'));
+    document.querySelectorAll('.main-tab-content').forEach(content => content.classList.remove('active'));
 
-  // activate the clicked tab
-  event.target.classList.add('active');
-  document.getElementById(tabName + '-main-tab').classList.add('active');
+    event.target.classList.add('active');
+    document.getElementById(tabName + '-main-tab').classList.add('active');
 
-  // set the global tracker and refresh button state
-  currentTab = tabName;   // 'dimensions' or 'metrics'
-  updateCreateButton();
-}
+    currentTab = tabName; // 'dimensions' or 'metrics'
+    updateCreateButton();
+  }
 
   function switchTab(event, tabName) {
     document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
     event.target.classList.add('active');
     document.getElementById(tabName + '-tab').classList.add('active');
+  }
+
+  // Override updateCreateButton to handle dynamic text
+  function updateCreateButton() {
+    const createBtn = document.getElementById('createBtn');
+    const sectionTitle = document.getElementById('createSectionTitle');
+    const processText = document.getElementById('processText');
+
+    const itemsCount = currentTab === 'dimensions' ? dimensions.length : metrics.length;
+    createBtn.disabled = !selectedPropertyId || itemsCount === 0;
+
+    if (currentTab === 'dimensions') {
+      createBtn.textContent = `Create ${itemsCount} Custom Dimensions`;
+      sectionTitle.textContent = "Create Custom Dimensions";
+      processText.textContent = "Creating custom dimensions...";
+    } else {
+      createBtn.textContent = `Create ${itemsCount} Custom Metrics`;
+      sectionTitle.textContent = "Create Custom Metrics";
+      processText.textContent = "Creating custom metrics...";
+    }
   }
   </script>
 </body>

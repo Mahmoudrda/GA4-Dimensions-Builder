@@ -85,11 +85,17 @@ class GA4Manager {
 }
 
 async function createAllDimensions() {
-  if (!selectedPropertyId || dimensions.length === 0) {
-    showError('Please select a property and add dimensions');
-    return;
-  }
+    if (!selectedPropertyId) {
+  throw new Error("Please select a property first");
+}
 
+if (currentTab === 'dimensions' && dimensions.length === 0) {
+  throw new Error("Please add at least one dimension");
+}
+
+if (currentTab === 'metrics' && metrics.length === 0) {
+  throw new Error("Please add at least one metric");
+}
   const options = {
     checkDuplicates: document.getElementById('checkDuplicates').checked,
     batchSize: parseInt(document.getElementById('batchSize').value),
