@@ -1196,13 +1196,19 @@ function validateMetrics(metrics) {
 
 function updateCreateButton() {
   const createBtn = document.getElementById('createBtn');
+  const sectionTitle = document.getElementById('createSectionTitle');
+  const processText = document.getElementById('processText');
+
   const itemsCount = currentTab === 'dimensions' ? dimensions.length : metrics.length;
   createBtn.disabled = !selectedPropertyId || itemsCount === 0;
-  
-  // Update button text based on current tab
+
   if (currentTab === 'dimensions') {
-    createBtn.textContent = `Create ${dimensions.length} Custom Dimensions`;
+    createBtn.textContent = `Create ${itemsCount} Custom Dimensions`;
+    sectionTitle.textContent = "Create Custom Dimensions";
+    processText.textContent = "Creating custom dimensions...";
   } else {
-    createBtn.textContent = `Create ${metrics.length} Custom Metrics`;
+    createBtn.textContent = `Create ${itemsCount} Custom Metrics`;
+    sectionTitle.textContent = "Create Custom Metrics";
+    processText.textContent = "Creating custom metrics...";
   }
 }

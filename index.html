@@ -228,15 +228,19 @@
           </div>
 
           <!-- Create Button -->
+          <!-- Shared Create Button -->
           <div class="step">
-            <h3><span class="step-number">5</span>Create Custom Metrics</h3>
-            <button id="createBtn" onclick="createAllDimensions()" disabled>Create Custom Metrics</button>
+            <h3><span class="step-number">5</span>
+              <span id="createSectionTitle">Create Custom Dimensions</span>
+            </h3>
+            <button id="createBtn" onclick="createAllDimensions()" disabled>
+              Create Custom Dimensions
+            </button>
             <div id="processLoader" style="display: none; margin-top: 15px;">
-              <div class="loading"></div> Creating custom metrics...
+              <div class="loading"></div>
+              <span id="processText">Creating custom dimensions...</span>
             </div>
           </div>
-        </div>
-      </div>
 
       <!-- Results -->
       <div id="results" style="display: none;"></div>
@@ -251,13 +255,18 @@
   <script>
   // Fixed version of switchMainTab and switchTab
   function switchMainTab(event, tabName) {
-    document.querySelectorAll('.main-tab').forEach(tab => tab.classList.remove('active'));
-    document.querySelectorAll('.main-tab-content').forEach(content => content.classList.remove('active'));
-    event.target.classList.add('active');
-    document.getElementById(tabName + '-main-tab').classList.add('active');
-    currentTab = tabName;
-    updateCreateButton();
-  }
+  // remove active from all tabs
+  document.querySelectorAll('.main-tab').forEach(tab => tab.classList.remove('active'));
+  document.querySelectorAll('.main-tab-content').forEach(content => content.classList.remove('active'));
+
+  // activate the clicked tab
+  event.target.classList.add('active');
+  document.getElementById(tabName + '-main-tab').classList.add('active');
+
+  // set the global tracker and refresh button state
+  currentTab = tabName;   // 'dimensions' or 'metrics'
+  updateCreateButton();
+}
 
   function switchTab(event, tabName) {
     document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
