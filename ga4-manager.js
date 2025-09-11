@@ -85,36 +85,42 @@ class GA4Manager {
 }
 
 async function createAllDimensions() {
-    if (!selectedPropertyId) {
-  throw new Error("Please select a property first");
-}
+  // 1. Validate property
+  if (!selectedPropertyId) {
+    throw new Error("Please select a property first");
+  }
 
-if (currentTab === 'dimensions' && dimensions.length === 0) {
-  throw new Error("Please add at least one dimension");
-}
+  // 2. Validate items depending on active tab
+  if (currentTab === 'dimensions' && dimensions.length === 0) {
+    throw new Error("Please add at least one dimension");
+  }
+  if (currentTab === 'metrics' && metrics.length === 0) {
+    throw new Error("Please add at least one metric");
+  }
 
-if (currentTab === 'metrics' && metrics.length === 0) {
-  throw new Error("Please add at least one metric");
-}
-  const options = {
-    checkDuplicates: document.getElementById('checkDuplicates').checked,
-    batchSize: parseInt(document.getElementById('batchSize').value),
-    delay: parseInt(document.getElementById('delay').value)
-  };
+  // 3. Get options (shared block, always exists now)
+  const checkDuplicatesEl = document.getElementById("checkDuplicates");
+  const batchSizeEl = document.getElementById("batchSize");
+  const delayEl = document.getElementById("delay");
 
-  document.getElementById('processLoader').style.display = 'block';
-  document.getElementById('createBtn').disabled = true;
+  const checkDuplicates = checkDuplicatesEl ? checkDuplicatesEl.checked : true;
+  const batchSize = batchSizeEl ? parseInt(batchSizeEl.value, 10) : 10;
+  const delay = delayEl ? parseInt(delayEl.value, 10) : 1000;
+
+  // 4. Show loader
+  document.getElementById("processLoader").style.display = "block";
 
   try {
     if (currentTab === 'dimensions') {
-      const result = await createCustomDimensions(selectedPropertyId, dimensions, options);
-      handleCreateResults(result, 'dimensions');
+      await batchCreate(dimensions, "dimension", { checkDuplicates, batchSize, delay });
     } else {
-      const result = await createCustomMetrics(selectedPropertyId, metrics, options);
-      handleCreateResults(result, 'metrics');
+      await batchCreate(metrics, "metric", { checkDuplicates, batchSize, delay });
     }
-  } catch (error) {
-    handleError(error);
+    showResults("All items created successfully!");
+  } catch (err) {
+    showResults("Error: " + err.message);
+  } finally {
+    document.getElementById("processLoader").style.display = "none";
   }
 }
 

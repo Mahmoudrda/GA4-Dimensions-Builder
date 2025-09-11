@@ -180,6 +180,26 @@
         </div>
       </div>
 
+      <!-- Step 4: Shared Options -->
+      <div class="step">
+        <h3><span class="step-number">4</span>Options</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+          <div class="form-group">
+            <label><input type="checkbox" id="checkDuplicates" checked> Check for duplicates</label>
+          </div>
+          <div class="form-group">
+            <label>Batch Size:
+              <input type="number" id="batchSize" value="10" min="1" max="50" style="width: 80px;">
+            </label>
+          </div>
+          <div class="form-group">
+            <label>Delay (ms):
+              <input type="number" id="delay" value="1000" min="100" max="5000" style="width: 100px;">
+            </label>
+          </div>
+        </div>
+      </div>
+
       <!-- Step 5: Shared Create Button -->
       <div class="step">
         <h3><span class="step-number">5</span>
