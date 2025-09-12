@@ -381,7 +381,7 @@
       margin: 0;
       font-weight: var(--font-weight-semibold);
       font-size: var(--font-size-base);
-      color: hsl(0, 0%, 100%);
+      color: #2196f3;
     }
     
     #propertySelect {
@@ -612,7 +612,7 @@
       margin: 0;
       font-weight: var(--font-weight-semibold);
       font-size : var(--font-size-base);
-      color: hsl(0, 0%, 100%);
+      color: #2196f3;
     }
 
     /* Property Select */
