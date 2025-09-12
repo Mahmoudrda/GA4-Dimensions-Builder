@@ -377,6 +377,12 @@
       padding: 15px;
       margin: 15px 0;
     }
+    #selectedPropertiesDisplay p {
+      margin: 0;
+      font-weight: var(--font-weight-semibold);
+      font-size: var(--font-size-base);
+      color: #2196f3;
+    }
     
     #propertySelect {
       min-height: 120px;
@@ -604,7 +610,9 @@
 
     #selectedPropertiesDisplay p {
       margin: 0;
-      font-weight: 600;
+      font-weight: var(--font-weight-semibold);
+      font-size : var(--font-size-base);
+      color: #2196f3;
     }
 
     /* Property Select */
@@ -614,6 +622,7 @@
       border-radius: var(--border-radius);
       background: white;
     }
+    
 
     #propertySelect option {
       padding: var(--spacing-2);
