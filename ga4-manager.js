@@ -1,5 +1,6 @@
 class GA4Manager {
   constructor() {
+    console.log('Initializing GA4Manager...');
     this.accessToken = null;
     this.isAuthenticated = false;
     this.tokenClient = null;
@@ -31,16 +32,20 @@ class GA4Manager {
   }
 
   async authenticate() {
+    console.log('Attempting authentication...');
     try {
       this.tokenClient.requestAccessToken({prompt: 'consent'});
     } catch (error) {
+      console.error('Authentication failed:', error);
       throw new Error('Authentication failed: ' + error.message);
     }
   }
 
   handleAuthSuccess(response) {
+    console.log('Authentication successful');
     this.isAuthenticated = true;
     this.accessToken = response.access_token;
+    console.log('Access token received, length:', this.accessToken.length);
     const authBtn = document.getElementById('loadPropsBtn');
     if (authBtn && authBtn.textContent === 'Load My GA4 Properties') {
       authBtn.textContent = 'Authenticated - Click to Load Properties';
@@ -49,7 +54,9 @@ class GA4Manager {
   }
 
   async makeApiCall(url, options = {}) {
+    console.log('Making API call to:', url);
     if (!this.accessToken) {
+      console.log('No access token, initiating authentication...');
       await this.authenticate();
       return;
     }
@@ -63,8 +70,11 @@ class GA4Manager {
 
     try {
       const finalOptions = { ...defaultOptions, ...options };
+      console.log('API request options:', finalOptions);
       const response = await fetch(url, finalOptions);
+      
       if (!response.ok) {
+        console.error('API call failed:', response.status, response.statusText);
         if (response.status === 401) {
           this.accessToken = null;
           this.isAuthenticated = false;
@@ -73,8 +83,11 @@ class GA4Manager {
         const errorText = await response.text();
         throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
       }
-      return await response.json();
+      const data = await response.json();
+      console.log('API response:', data);
+      return data;
     } catch (error) {
+      console.error('API call error:', error);
       throw error;
     }
   }
@@ -93,7 +106,13 @@ const BATCH_SIZE = 10;
 const DELAY_MS = 1000;
 
 async function createAllDimensions() {
+  console.log('Starting creation process...');
+  console.log('Selected properties:', selectedPropertyIds);
+  console.log('Current tab:', currentTab);
+  console.log('Items to create:', currentTab === 'dimensions' ? dimensions : metrics);
+
   if (selectedPropertyIds.length === 0) {
+    console.error('No properties selected');
     throw new Error("Please select at least one property first");
   }
   if (currentTab === 'dimensions' && dimensions.length === 0) {
@@ -137,6 +156,10 @@ async function createAllDimensions() {
 }
 
 async function createCustomDimensions(propertyId, dimensions, options = {}) {
+  console.log(`Creating dimensions for property ${propertyId}`);
+  console.log('Dimensions to create:', dimensions);
+  console.log('Options:', options);
+
   if (!propertyId || !dimensions || dimensions.length === 0) {
     return { success: false, error: "Invalid input parameters." };
   }
@@ -147,6 +170,7 @@ async function createCustomDimensions(propertyId, dimensions, options = {}) {
   
   try {
     const existingResult = await getExistingCustomDimensions(propertyId);
+    console.log('Existing dimensions:', existingResult);
     const existingNames = existingResult.success ? 
       existingResult.dimensions.map(d => d.parameterName.toLowerCase()) : [];
 
@@ -229,6 +253,7 @@ async function createCustomDimensions(propertyId, dimensions, options = {}) {
     };
 
   } catch (error) {
+    console.error('Error creating dimensions:', error);
     return { success: false, error: error.toString() };
   }
 }
@@ -573,18 +598,21 @@ function handlePropertiesLoaded(result) {
     });
 
     Object.keys(accountGroups).forEach(accountName => {
+      console.log(`Creating optgroup for account: ${accountName}`);
       const optgroup = document.createElement('optgroup');
       optgroup.label = accountName;
       
+      console.log(`Adding ${accountGroups[accountName].length} properties to group`);
       accountGroups[accountName].forEach(prop => {
+        console.log(`Adding property: ${prop.name} (${prop.id})`);
         const option = document.createElement('option');
         option.value = prop.id;
         option.textContent = `${prop.name} (${prop.id})`;
         optgroup.appendChild(option);
       });
-      
+
       select.appendChild(optgroup);
-    });
+});
     
     // Convert to multi-select
     select.multiple = true;
@@ -971,8 +999,13 @@ function parseCSV(csv) {
 }
 
 function processInputData(data, format) {
+  console.log('Processing input data');
+  console.log('Format:', format);
+  console.log('Data:', data);
+
   try {
     const result = parseInput(data, format);
+    console.log('Parse result:', result);
     
     if (result.success) {
       if (result.dimensions && result.dimensions.length > 0) {
@@ -990,6 +1023,7 @@ function processInputData(data, format) {
       showError('Parse error: ' + result.error);
     }
   } catch (error) {
+    console.error('Error processing input:', error);
     handleError(error);
   }
 }
@@ -1258,10 +1292,12 @@ function validateAllMetrics() {
 }
 
 function validateDimensions(dimensions) {
+  console.log('Validating dimensions:', dimensions);
   const errors = [];
   const warnings = [];
   
   dimensions.forEach((dim, index) => {
+    console.log(`Validating dimension ${index + 1}:`, dim);
     if (!dim.displayName) {
       errors.push(`Row ${index + 1}: Display name is required`);
     }
@@ -1285,6 +1321,10 @@ function validateDimensions(dimensions) {
       dim.scope = 'EVENT';
     }
   });
+  
+  if (errors.length > 0 || warnings.length > 0) {
+    console.log('Validation results:', { errors, warnings });
+  }
   
   return { errors, warnings };
 }
