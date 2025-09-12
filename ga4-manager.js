@@ -157,10 +157,10 @@ async function createAllDimensions() {
       console.log(`createAllDimensions: Processing property ${propertyId}`);
       
       if (currentTab === 'dimensions') {
-        const result = await createCustomDimensions(propertyId, dimensions, { checkDuplicates, batchSize, delay });
+        const result = await createCustomDimensions(propertyId, dimensions, { checkDuplicates });
         allResults.push({ propertyId, type: 'dimensions', result });
       } else {
-        const result = await createCustomMetrics(propertyId, metrics, { checkDuplicates, batchSize, delay });
+        const result = await createCustomMetrics(propertyId, metrics, { checkDuplicates });
         allResults.push({ propertyId, type: 'metrics', result });
       }
     }
@@ -187,8 +187,9 @@ async function createCustomDimensions(propertyId, dimensions, options = {}) {
   }
 
   const results = [];
-  const batchSize = options.batchSize || 10;
-  const delay = options.delay || 1000;
+  // Use fixed batchSize and delay
+  // const batchSize = 10;
+  // const delay = 1000;
   
   try {
     console.log('createCustomDimensions: Getting existing dimensions for duplicate check');
@@ -318,9 +319,10 @@ async function createCustomMetrics(propertyId, metrics, options = {}) {
   }
 
   const results = [];
-  const batchSize = options.batchSize || 10;
-  const delay = options.delay || 1000;
-  
+  // Use fixed batchSize and delay
+  // const batchSize =  10;
+  // const delay = 1000;
+
   try {
     console.log('createCustomMetrics: Getting existing metrics for duplicate check');
     const existingResult = await getExistingCustomMetrics(propertyId);
