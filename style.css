@@ -859,3 +859,37 @@
       margin-bottom: var(--spacing-4);
       opacity: 0.5;
     }
+    /* Accessibility helpers */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0);
+  white-space: nowrap; border: 0;
+}
+
+.help-text {
+  font-size: var(--font-size-sm);
+  color: var(--gray-500);
+  margin-top: var(--spacing-2);
+  display: block;
+}
+
+/* Grouped buttons */
+.button-group {
+  display: flex;
+  gap: var(--spacing-3);
+  margin-top: var(--spacing-4);
+  flex-wrap: wrap;
+}
+
+/* Responsive tweaks */
+@media (max-width: 768px) {
+  .tabs, .main-tabs {
+    flex-direction: column;
+  }
+
+  button, .btn-primary {
+    width: 100%;
+  }
+}
