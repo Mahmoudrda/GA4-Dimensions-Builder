@@ -157,10 +157,10 @@ async function createAllDimensions() {
       console.log(`createAllDimensions: Processing property ${propertyId}`);
       
       if (currentTab === 'dimensions') {
-        const result = await createCustomDimensions(propertyId, dimensions, { checkDuplicates });
+        const result = await createCustomDimensions(propertyId, dimensions, { checkDuplicates, batchSize, delay });
         allResults.push({ propertyId, type: 'dimensions', result });
       } else {
-        const result = await createCustomMetrics(propertyId, metrics, { checkDuplicates });
+        const result = await createCustomMetrics(propertyId, metrics, { checkDuplicates, batchSize, delay });
         allResults.push({ propertyId, type: 'metrics', result });
       }
     }
@@ -187,9 +187,8 @@ async function createCustomDimensions(propertyId, dimensions, options = {}) {
   }
 
   const results = [];
-  // Use fixed batchSize and delay
-  // const batchSize = 10;
-  // const delay = 1000;
+  const batchSize = options.batchSize || 10;
+  const delay = options.delay || 1000;
   
   try {
     console.log('createCustomDimensions: Getting existing dimensions for duplicate check');
@@ -319,10 +318,9 @@ async function createCustomMetrics(propertyId, metrics, options = {}) {
   }
 
   const results = [];
-  // Use fixed batchSize and delay
-  // const batchSize =  10;
-  // const delay = 1000;
-
+  const batchSize = options.batchSize || 10;
+  const delay = options.delay || 1000;
+  
   try {
     console.log('createCustomMetrics: Getting existing metrics for duplicate check');
     const existingResult = await getExistingCustomMetrics(propertyId);
@@ -1060,14 +1058,6 @@ function generateSample() {
   } else {
     const sampleMetrics = [
       {
-        displayName: "Revenue Per User",
-        parameterName: "revenue_per_user",
-        description: "Average revenue generated per user",
-        measurementUnit: "CURRENCY",
-        scope: "EVENT",
-        source: 'sample'
-      },
-      {
         displayName: "Page Load Time",
         parameterName: "page_load_time",
         description: "Time taken to load the page",
@@ -1233,9 +1223,9 @@ function parseCSVData(csvData) {
     parameterName: findHeader(headers, ['key', 'parameter name', 'parametername']),
     displayName: findHeader(headers, ['name', 'display name', 'displayname']),
     description: findHeader(headers, ['notes/description', 'description', 'notes', 'desc']),
-    scope: findHeader(headers, ['page-level', 'scope', 'level']),
     createDimension: findHeader(headers, ['ga4 custom dimension', 'custom dimension', 'dimension']),
-    createMetric: findHeader(headers, ['ga4 custom metric', 'custom metric', 'metric'])
+    createMetric: findHeader(headers, ['ga4 custom metric', 'custom metric', 'metric']),
+    measurementUnit: findHeader(headers, ['measurement unit', 'measurementunit', 'unit'])
   };
 
   console.log('parseCSVData: Header mapping:', headerMap);
@@ -1261,8 +1251,7 @@ function parseCSVData(csvData) {
 
       // Create dimension if requested
       if (shouldCreateDimension) {
-        const scope = headerMap.scope !== -1 ? 
-          (String(row[headerMap.scope] || '').toLowerCase().includes('true') ? 'EVENT' : 'USER') : 'EVENT';
+        const scope = "EVENT"; 
         
         dimensions.push({
           ...baseItem,
@@ -1276,7 +1265,7 @@ function parseCSVData(csvData) {
       if (shouldCreateMetric) {
         metrics.push({
           ...baseItem,
-          measurementUnit: 'STANDARD', // Default unit, could be enhanced to read from CSV
+          measurementUnit: (headerMap.measurementUnit !== -1 && row[headerMap.measurementUnit]) ? row[headerMap.measurementUnit] : 'STANDARD',
           scope: 'EVENT'
         });
         console.log(`parseCSVData: Added metric from row ${i}`);
@@ -1338,14 +1327,6 @@ function generateSampleTemplate(format) {
       customMetric: "FALSE"
     },
     {
-      parameterName: "revenue_per_user",
-      displayName: "Revenue Per User",
-      description: "Average revenue generated per user",
-      pageLevel: "TRUE", // EVENT scope for metric
-      customDimension: "FALSE",
-      customMetric: "TRUE"
-    },
-    {
       parameterName: "page_load_time",
       displayName: "Page Load Time",
       description: "Time taken to load the page",
@@ -1357,9 +1338,9 @@ function generateSampleTemplate(format) {
   
   switch (format) {
     case 'csv':
-      let csv = "Key,Name,Notes/Description,Page-Level,GA4 Custom Dimension,GA4 Custom Metric\n";
+      let csv = "Key,Name,Notes/Description,GA4 Custom Dimension,GA4 Custom Metric,Measurement Unit\n";
       sampleData.forEach(item => {
-        csv += `"${item.parameterName}","${item.displayName}","${item.description}","${item.pageLevel}","${item.customDimension}","${item.customMetric}"\n`;
+        csv += `"${item.parameterName}","${item.displayName}","${item.description}","${item.customDimension}","${item.customMetric}","${item.measurementUnit}"\n`;
       });
       return csv;
     
