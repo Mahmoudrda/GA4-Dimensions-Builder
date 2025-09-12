@@ -1,4 +1,414 @@
-});
+class GA4Manager {
+  constructor() {
+    this.accessToken = null;
+    this.isAuthenticated = false;
+    this.tokenClient = null;
+    this.init();
+  }
+
+  init() {
+    gapi.load('client', () => {
+      gapi.client.init({
+        apiKey: '', 
+        discoveryDocs: ['https://analyticsadmin.googleapis.com/$discovery/rest?version=v1beta']
+      });
+    });
+
+    google.accounts.id.initialize({
+      client_id: '903553466558-ggf600mr9qauuimpfmc0olc94dledr2n.apps.googleusercontent.com'
+    });
+
+    this.tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: '903553466558-ggf600mr9qauuimpfmc0olc94dledr2n.apps.googleusercontent.com',
+      scope: 'https://www.googleapis.com/auth/analytics.edit',
+      callback: (response) => {
+        if (response.error !== undefined) {
+          throw new Error(response.error);
+        }
+        this.handleAuthSuccess(response);
+      },
+    });
+  }
+
+  async authenticate() {
+    try {
+      this.tokenClient.requestAccessToken({prompt: 'consent'});
+    } catch (error) {
+      throw new Error('Authentication failed: ' + error.message);
+    }
+  }
+
+  handleAuthSuccess(response) {
+    this.isAuthenticated = true;
+    this.accessToken = response.access_token;
+    const authBtn = document.getElementById('loadPropsBtn');
+    if (authBtn && authBtn.textContent === 'Load My GA4 Properties') {
+      authBtn.textContent = 'Authenticated - Click to Load Properties';
+      authBtn.style.background = 'linear-gradient(135deg, #43a047 0%, #2e7d32 100%)';
+    }
+  }
+
+  async makeApiCall(url, options = {}) {
+    if (!this.accessToken) {
+      await this.authenticate();
+      return;
+    }
+
+    const defaultOptions = {
+      headers: {
+        'Authorization': `Bearer ${this.accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    };
+
+    try {
+      const finalOptions = { ...defaultOptions, ...options };
+      const response = await fetch(url, finalOptions);
+      if (!response.ok) {
+        if (response.status === 401) {
+          this.accessToken = null;
+          this.isAuthenticated = false;
+          throw new Error('Authentication expired. Please try again.');
+        }
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+      }
+      return await response.json();
+    } catch (error) {
+      throw error;
+    }
+  }
+}
+
+// Global variables
+let selectedPropertyIds = [];
+let dimensions = [];
+let metrics = [];
+let existingDimensions = [];
+let existingMetrics = [];
+let currentTab = 'dimensions';
+
+// Fixed values for batch processing
+const BATCH_SIZE = 10;
+const DELAY_MS = 1000;
+
+async function createAllDimensions() {
+  if (selectedPropertyIds.length === 0) {
+    throw new Error("Please select at least one property first");
+  }
+  if (currentTab === 'dimensions' && dimensions.length === 0) {
+    throw new Error("Please add at least one dimension");
+  }
+  if (currentTab === 'metrics' && metrics.length === 0) {
+    throw new Error("Please add at least one metric");
+  }
+
+  const checkDuplicates = document.getElementById("checkDuplicates").checked;
+
+  document.getElementById("processLoader").style.display = "block";
+  document.getElementById("createBtn").disabled = true;
+
+  try {
+    const allResults = [];
+    for (const propertyId of selectedPropertyIds) {
+      if (currentTab === 'dimensions') {
+        const result = await createCustomDimensions(propertyId, dimensions, { 
+          checkDuplicates, 
+          batchSize: BATCH_SIZE, 
+          delay: DELAY_MS 
+        });
+        allResults.push({ propertyId, type: 'dimensions', result });
+      } else {
+        const result = await createCustomMetrics(propertyId, metrics, { 
+          checkDuplicates, 
+          batchSize: BATCH_SIZE, 
+          delay: DELAY_MS 
+        });
+        allResults.push({ propertyId, type: 'metrics', result });
+      }
+    }
+    showMultiPropertyResults(allResults);
+  } catch (err) {
+    showResults("❌ Error: " + err.message, true);
+  } finally {
+    document.getElementById("processLoader").style.display = "none";
+    document.getElementById("createBtn").disabled = false;
+  }
+}
+
+async function createCustomDimensions(propertyId, dimensions, options = {}) {
+  if (!propertyId || !dimensions || dimensions.length === 0) {
+    return { success: false, error: "Invalid input parameters." };
+  }
+
+  const results = [];
+  const batchSize = options.batchSize || BATCH_SIZE;
+  const delay = options.delay || DELAY_MS;
+  
+  try {
+    const existingResult = await getExistingCustomDimensions(propertyId);
+    const existingNames = existingResult.success ? 
+      existingResult.dimensions.map(d => d.parameterName.toLowerCase()) : [];
+
+    for (let i = 0; i < dimensions.length; i += batchSize) {
+      const batch = dimensions.slice(i, i + batchSize);
+      for (let j = 0; j < batch.length; j++) {
+        const dimension = batch[j];
+        const actualIndex = i + j;
+        try {
+          if (!dimension.parameterName || !dimension.displayName) {
+            results.push({
+              index: actualIndex,
+              success: false,
+              error: "Missing required fields (parameterName or displayName)",
+              dimension: dimension
+            });
+            continue;
+          }
+          if (options.checkDuplicates && existingNames.includes(dimension.parameterName.toLowerCase())) {
+            results.push({
+              index: actualIndex,
+              success: false,
+              error: "Custom dimension already exists",
+              dimension: dimension,
+              skipped: true
+            });
+            continue;
+          }
+          const payload = {
+            parameterName: dimension.parameterName,
+            displayName: dimension.displayName,
+            scope: dimension.scope || "EVENT",
+            description: dimension.description || "",
+            disallowAdsPersonalization: dimension.disallowAdsPersonalization || false
+          };
+          const url = `https://analyticsadmin.googleapis.com/v1beta/properties/${propertyId}/customDimensions`;
+          const response = await fetch(url, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${ga4Manager.accessToken}`,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload)
+          });
+          const responseText = await response.text();
+          const responseCode = response.status;
+          results.push({
+            index: actualIndex,
+            success: responseCode >= 200 && responseCode < 300,
+            statusCode: responseCode,
+            response: responseText,
+            dimension: dimension,
+            created: responseCode >= 200 && responseCode < 300 ? JSON.parse(responseText) : null
+          });
+        } catch (error) {
+          results.push({
+            index: actualIndex,
+            success: false,
+            error: error.toString(),
+            dimension: dimension
+          });
+        }
+      }
+      if (i + batchSize < dimensions.length) {
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+
+    const summary = {
+      total: dimensions.length,
+      successful: results.filter(r => r.success).length,
+      failed: results.filter(r => !r.success && !r.skipped).length,
+      skipped: results.filter(r => r.skipped).length
+    };
+
+    return { 
+      success: true, 
+      results: results,
+      summary: summary
+    };
+
+  } catch (error) {
+    return { success: false, error: error.toString() };
+  }
+}
+
+async function createCustomMetrics(propertyId, metrics, options = {}) {
+  if (!propertyId || !metrics || metrics.length === 0) {
+    return { success: false, error: "Invalid input parameters." };
+  }
+
+  const results = [];
+  const batchSize = options.batchSize || BATCH_SIZE;
+  const delay = options.delay || DELAY_MS;
+  
+  try {
+    const existingResult = await getExistingCustomMetrics(propertyId);
+    const existingNames = existingResult.success ? 
+      existingResult.metrics.map(m => m.parameterName.toLowerCase()) : [];
+
+    for (let i = 0; i < metrics.length; i += batchSize) {
+      const batch = metrics.slice(i, i + batchSize);
+      for (let j = 0; j < batch.length; j++) {
+        const metric = batch[j];
+        const actualIndex = i + j;
+        try {
+          if (!metric.parameterName || !metric.displayName) {
+            results.push({
+              index: actualIndex,
+              success: false,
+              error: "Missing required fields (parameterName or displayName)",
+              metric: metric
+            });
+            continue;
+          }
+          if (options.checkDuplicates && existingNames.includes(metric.parameterName.toLowerCase())) {
+            results.push({
+              index: actualIndex,
+              success: false,
+              error: "Custom metric already exists",
+              metric: metric,
+              skipped: true
+            });
+            continue;
+          }
+          const payload = {
+            parameterName: metric.parameterName,
+            displayName: metric.displayName,
+            description: metric.description || "",
+            measurementUnit: metric.measurementUnit || "STANDARD",
+            scope: "EVENT"
+          };
+          const url = `https://analyticsadmin.googleapis.com/v1beta/properties/${propertyId}/customMetrics`;
+          const response = await fetch(url, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${ga4Manager.accessToken}`,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload)
+          });
+          const responseText = await response.text();
+          const responseCode = response.status;
+          results.push({
+            index: actualIndex,
+            success: responseCode >= 200 && responseCode < 300,
+            statusCode: responseCode,
+            response: responseText,
+            metric: metric,
+            created: responseCode >= 200 && responseCode < 300 ? JSON.parse(responseText) : null
+          });
+        } catch (error) {
+          results.push({
+            index: actualIndex,
+            success: false,
+            error: error.toString(),
+            metric: metric
+          });
+        }
+      }
+      if (i + batchSize < metrics.length) {
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+
+    const summary = {
+      total: metrics.length,
+      successful: results.filter(r => r.success).length,
+      failed: results.filter(r => !r.success && !r.skipped).length,
+      skipped: results.filter(r => r.skipped).length
+    };
+
+    return { 
+      success: true, 
+      results: results,
+      summary: summary
+    };
+
+  } catch (error) {
+    return { success: false, error: error.toString() };
+  }
+}
+
+function handleCreateResults(result, type) {
+  document.getElementById('processLoader').style.display = 'none';
+  document.getElementById('createBtn').disabled = false;
+
+  if (result.success) {
+    displayResults(result, type);
+    // Refresh existing items for all selected properties
+    if (selectedPropertyIds.length > 0) {
+      if (type === 'dimensions') {
+        loadExistingDimensions();
+      } else {
+        loadExistingMetrics();
+      }
+    }
+  } else {
+    showError(`Creation failed: ${result.error}`);
+  }
+}
+
+function showMultiPropertyResults(allResults) {
+  const resultsDiv = document.getElementById('results');
+  let html = '<div class="results">';
+  
+  // Overall summary
+  let totalSuccessful = 0;
+  let totalFailed = 0;
+  let totalSkipped = 0;
+  let totalItems = 0;
+  
+  allResults.forEach(propResult => {
+    if (propResult.result.success && propResult.result.summary) {
+      totalSuccessful += propResult.result.summary.successful;
+      totalFailed += propResult.result.summary.failed;
+      totalSkipped += propResult.result.summary.skipped;
+      totalItems += propResult.result.summary.total;
+    }
+  });
+  
+  html += '<div class="results-header">';
+  html += `<h3>Multi-Property Results Summary</h3>`;
+  html += `<p class="success">✅ Total successful: ${totalSuccessful}</p>`;
+  if (totalFailed > 0) {
+    html += `<p class="error">❌ Total failed: ${totalFailed}</p>`;
+  }
+  if (totalSkipped > 0) {
+    html += `<p class="warning">⚠️ Total skipped: ${totalSkipped}</p>`;
+  }
+  html += `<p>Processed across ${selectedPropertyIds.length} properties</p>`;
+  html += '</div>';
+
+  // Individual property results
+  html += '<div class="results-body">';
+  
+  allResults.forEach(propResult => {
+    const { propertyId, type, result } = propResult;
+    const itemType = type === 'dimensions' ? 'dimension' : 'metric';
+    
+    html += `<div class="property-results">`;
+    html += `<h4>Property: ${propertyId}</h4>`;
+    
+    if (result.success && result.results) {
+      result.results.forEach(item => {
+        const statusClass = item.success ? 'success' : (item.skipped ? 'warning' : 'error');
+        const statusIcon = item.success ? '✅' : (item.skipped ? '⚠️' : '❌');
+        const itemData = item[itemType] || item.dimension || item.metric;
+        
+        html += '<div class="result-item">';
+        html += `<div>`;
+        html += `<span class="${statusClass}"><strong>${statusIcon}</strong></span> `;
+        html += `<strong>${itemData.displayName}</strong> (${itemData.parameterName})`;
+        if (item.error) {
+          html += `<br><small class="error">${item.error}</small>`;
+        } else if (item.skipped) {
+          html += `<br><small class="warning">Already exists</small>`;
+        }
+        html += '</div>';
+        html += `<span class="${statusClass}">Status: ${item.statusCode || 'N/A'}</span>`;
+        html += '</div>';
+      });
     } else {
       html += `<div class="result-item"><span class="error">Property failed: ${result.error}</span></div>`;
     }
@@ -929,416 +1339,4 @@ function updateCreateButton() {
     sectionTitle.textContent = "Create Custom Metrics";
     processText.textContent = "Creating custom metrics...";
   }
-}n\class GA4Manager {
-  constructor() {
-    this.accessToken = null;
-    this.isAuthenticated = false;
-    this.tokenClient = null;
-    this.init();
-  }
-
-  init() {
-    gapi.load('client', () => {
-      gapi.client.init({
-        apiKey: '', 
-        discoveryDocs: ['https://analyticsadmin.googleapis.com/$discovery/rest?version=v1beta']
-      });
-    });
-
-    google.accounts.id.initialize({
-      client_id: '903553466558-ggf600mr9qauuimpfmc0olc94dledr2n.apps.googleusercontent.com'
-    });
-
-    this.tokenClient = google.accounts.oauth2.initTokenClient({
-      client_id: '903553466558-ggf600mr9qauuimpfmc0olc94dledr2n.apps.googleusercontent.com',
-      scope: 'https://www.googleapis.com/auth/analytics.edit',
-      callback: (response) => {
-        if (response.error !== undefined) {
-          throw new Error(response.error);
-        }
-        this.handleAuthSuccess(response);
-      },
-    });
-  }
-
-  async authenticate() {
-    try {
-      this.tokenClient.requestAccessToken({prompt: 'consent'});
-    } catch (error) {
-      throw new Error('Authentication failed: ' + error.message);
-    }
-  }
-
-  handleAuthSuccess(response) {
-    this.isAuthenticated = true;
-    this.accessToken = response.access_token;
-    const authBtn = document.getElementById('loadPropsBtn');
-    if (authBtn && authBtn.textContent === 'Load My GA4 Properties') {
-      authBtn.textContent = 'Authenticated - Click to Load Properties';
-      authBtn.style.background = 'linear-gradient(135deg, #43a047 0%, #2e7d32 100%)';
-    }
-  }
-
-  async makeApiCall(url, options = {}) {
-    if (!this.accessToken) {
-      await this.authenticate();
-      return;
-    }
-
-    const defaultOptions = {
-      headers: {
-        'Authorization': `Bearer ${this.accessToken}`,
-        'Content-Type': 'application/json'
-      }
-    };
-
-    try {
-      const finalOptions = { ...defaultOptions, ...options };
-      const response = await fetch(url, finalOptions);
-      if (!response.ok) {
-        if (response.status === 401) {
-          this.accessToken = null;
-          this.isAuthenticated = false;
-          throw new Error('Authentication expired. Please try again.');
-        }
-        const errorText = await response.text();
-        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
-      }
-      return await response.json();
-    } catch (error) {
-      throw error;
-    }
-  }
-}
-
-// Global variables
-let selectedPropertyIds = [];
-let dimensions = [];
-let metrics = [];
-let existingDimensions = [];
-let existingMetrics = [];
-let currentTab = 'dimensions';
-
-// Fixed values for batch processing
-const BATCH_SIZE = 10;
-const DELAY_MS = 1000;
-
-async function createAllDimensions() {
-  if (selectedPropertyIds.length === 0) {
-    throw new Error("Please select at least one property first");
-  }
-  if (currentTab === 'dimensions' && dimensions.length === 0) {
-    throw new Error("Please add at least one dimension");
-  }
-  if (currentTab === 'metrics' && metrics.length === 0) {
-    throw new Error("Please add at least one metric");
-  }
-
-  const checkDuplicates = document.getElementById("checkDuplicates").checked;
-
-  document.getElementById("processLoader").style.display = "block";
-  document.getElementById("createBtn").disabled = true;
-
-  try {
-    const allResults = [];
-    for (const propertyId of selectedPropertyIds) {
-      if (currentTab === 'dimensions') {
-        const result = await createCustomDimensions(propertyId, dimensions, { 
-          checkDuplicates, 
-          batchSize: BATCH_SIZE, 
-          delay: DELAY_MS 
-        });
-        allResults.push({ propertyId, type: 'dimensions', result });
-      } else {
-        const result = await createCustomMetrics(propertyId, metrics, { 
-          checkDuplicates, 
-          batchSize: BATCH_SIZE, 
-          delay: DELAY_MS 
-        });
-        allResults.push({ propertyId, type: 'metrics', result });
-      }
-    }
-    showMultiPropertyResults(allResults);
-  } catch (err) {
-    showResults("❌ Error: " + err.message, true);
-  } finally {
-    document.getElementById("processLoader").style.display = "none";
-    document.getElementById("createBtn").disabled = false;
-  }
-}
-
-async function createCustomDimensions(propertyId, dimensions, options = {}) {
-  if (!propertyId || !dimensions || dimensions.length === 0) {
-    return { success: false, error: "Invalid input parameters." };
-  }
-
-  const results = [];
-  const batchSize = options.batchSize || BATCH_SIZE;
-  const delay = options.delay || DELAY_MS;
-  
-  try {
-    const existingResult = await getExistingCustomDimensions(propertyId);
-    const existingNames = existingResult.success ? 
-      existingResult.dimensions.map(d => d.parameterName.toLowerCase()) : [];
-
-    for (let i = 0; i < dimensions.length; i += batchSize) {
-      const batch = dimensions.slice(i, i + batchSize);
-      for (let j = 0; j < batch.length; j++) {
-        const dimension = batch[j];
-        const actualIndex = i + j;
-        try {
-          if (!dimension.parameterName || !dimension.displayName) {
-            results.push({
-              index: actualIndex,
-              success: false,
-              error: "Missing required fields (parameterName or displayName)",
-              dimension: dimension
-            });
-            continue;
-          }
-          if (options.checkDuplicates && existingNames.includes(dimension.parameterName.toLowerCase())) {
-            results.push({
-              index: actualIndex,
-              success: false,
-              error: "Custom dimension already exists",
-              dimension: dimension,
-              skipped: true
-            });
-            continue;
-          }
-          const payload = {
-            parameterName: dimension.parameterName,
-            displayName: dimension.displayName,
-            scope: dimension.scope || "EVENT",
-            description: dimension.description || "",
-            disallowAdsPersonalization: dimension.disallowAdsPersonalization || false
-          };
-          const url = `https://analyticsadmin.googleapis.com/v1beta/properties/${propertyId}/customDimensions`;
-          const response = await fetch(url, {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${ga4Manager.accessToken}`,
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify(payload)
-          });
-          const responseText = await response.text();
-          const responseCode = response.status;
-          results.push({
-            index: actualIndex,
-            success: responseCode >= 200 && responseCode < 300,
-            statusCode: responseCode,
-            response: responseText,
-            dimension: dimension,
-            created: responseCode >= 200 && responseCode < 300 ? JSON.parse(responseText) : null
-          });
-        } catch (error) {
-          results.push({
-            index: actualIndex,
-            success: false,
-            error: error.toString(),
-            dimension: dimension
-          });
-        }
-      }
-      if (i + batchSize < dimensions.length) {
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-    }
-
-    const summary = {
-      total: dimensions.length,
-      successful: results.filter(r => r.success).length,
-      failed: results.filter(r => !r.success && !r.skipped).length,
-      skipped: results.filter(r => r.skipped).length
-    };
-
-    return { 
-      success: true, 
-      results: results,
-      summary: summary
-    };
-
-  } catch (error) {
-    return { success: false, error: error.toString() };
-  }
-}
-
-async function createCustomMetrics(propertyId, metrics, options = {}) {
-  if (!propertyId || !metrics || metrics.length === 0) {
-    return { success: false, error: "Invalid input parameters." };
-  }
-
-  const results = [];
-  const batchSize = options.batchSize || BATCH_SIZE;
-  const delay = options.delay || DELAY_MS;
-  
-  try {
-    const existingResult = await getExistingCustomMetrics(propertyId);
-    const existingNames = existingResult.success ? 
-      existingResult.metrics.map(m => m.parameterName.toLowerCase()) : [];
-
-    for (let i = 0; i < metrics.length; i += batchSize) {
-      const batch = metrics.slice(i, i + batchSize);
-      for (let j = 0; j < batch.length; j++) {
-        const metric = batch[j];
-        const actualIndex = i + j;
-        try {
-          if (!metric.parameterName || !metric.displayName) {
-            results.push({
-              index: actualIndex,
-              success: false,
-              error: "Missing required fields (parameterName or displayName)",
-              metric: metric
-            });
-            continue;
-          }
-          if (options.checkDuplicates && existingNames.includes(metric.parameterName.toLowerCase())) {
-            results.push({
-              index: actualIndex,
-              success: false,
-              error: "Custom metric already exists",
-              metric: metric,
-              skipped: true
-            });
-            continue;
-          }
-          const payload = {
-            parameterName: metric.parameterName,
-            displayName: metric.displayName,
-            description: metric.description || "",
-            measurementUnit: metric.measurementUnit || "STANDARD",
-            scope: "EVENT"
-          };
-          const url = `https://analyticsadmin.googleapis.com/v1beta/properties/${propertyId}/customMetrics`;
-          const response = await fetch(url, {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${ga4Manager.accessToken}`,
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify(payload)
-          });
-          const responseText = await response.text();
-          const responseCode = response.status;
-          results.push({
-            index: actualIndex,
-            success: responseCode >= 200 && responseCode < 300,
-            statusCode: responseCode,
-            response: responseText,
-            metric: metric,
-            created: responseCode >= 200 && responseCode < 300 ? JSON.parse(responseText) : null
-          });
-        } catch (error) {
-          results.push({
-            index: actualIndex,
-            success: false,
-            error: error.toString(),
-            metric: metric
-          });
-        }
-      }
-      if (i + batchSize < metrics.length) {
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-    }
-
-    const summary = {
-      total: metrics.length,
-      successful: results.filter(r => r.success).length,
-      failed: results.filter(r => !r.success && !r.skipped).length,
-      skipped: results.filter(r => r.skipped).length
-    };
-
-    return { 
-      success: true, 
-      results: results,
-      summary: summary
-    };
-
-  } catch (error) {
-    return { success: false, error: error.toString() };
-  }
-}
-
-function handleCreateResults(result, type) {
-  document.getElementById('processLoader').style.display = 'none';
-  document.getElementById('createBtn').disabled = false;
-
-  if (result.success) {
-    displayResults(result, type);
-    // Refresh existing items for all selected properties
-    if (selectedPropertyIds.length > 0) {
-      if (type === 'dimensions') {
-        loadExistingDimensions();
-      } else {
-        loadExistingMetrics();
-      }
-    }
-  } else {
-    showError(`Creation failed: ${result.error}`);
-  }
-}
-
-function showMultiPropertyResults(allResults) {
-  const resultsDiv = document.getElementById('results');
-  let html = '<div class="results">';
-  
-  // Overall summary
-  let totalSuccessful = 0;
-  let totalFailed = 0;
-  let totalSkipped = 0;
-  let totalItems = 0;
-  
-  allResults.forEach(propResult => {
-    if (propResult.result.success && propResult.result.summary) {
-      totalSuccessful += propResult.result.summary.successful;
-      totalFailed += propResult.result.summary.failed;
-      totalSkipped += propResult.result.summary.skipped;
-      totalItems += propResult.result.summary.total;
-    }
-  });
-  
-  html += '<div class="results-header">';
-  html += `<h3>Multi-Property Results Summary</h3>`;
-  html += `<p class="success">✅ Total successful: ${totalSuccessful}</p>`;
-  if (totalFailed > 0) {
-    html += `<p class="error">❌ Total failed: ${totalFailed}</p>`;
-  }
-  if (totalSkipped > 0) {
-    html += `<p class="warning">⚠️ Total skipped: ${totalSkipped}</p>`;
-  }
-  html += `<p>Processed across ${selectedPropertyIds.length} properties</p>`;
-  html += '</div>';
-
-  // Individual property results
-  html += '<div class="results-body">';
-  
-  allResults.forEach(propResult => {
-    const { propertyId, type, result } = propResult;
-    const itemType = type === 'dimensions' ? 'dimension' : 'metric';
-    
-    html += `<div class="property-results">`;
-    html += `<h4>Property: ${propertyId}</h4>`;
-    
-    if (result.success && result.results) {
-      result.results.forEach(item => {
-        const statusClass = item.success ? 'success' : (item.skipped ? 'warning' : 'error');
-        const statusIcon = item.success ? '✅' : (item.skipped ? '⚠️' : '❌');
-        const itemData = item[itemType] || item.dimension || item.metric;
-
-        html += `<div class="result-item ${statusClass}">`;
-        html += `<span class="status-icon">${statusIcon}</span>`;
-        html += `<span class="item-name">${itemData.name}</span>`;
-        html += `</div>`;
-      });
-    } else {
-      html += `<p class="error">❌ No results found for this property.</p>`;
-    }
-
-    html += '</div>';
-  });
-
-  html += '</div>';
-  resultsDiv.innerHTML = html;
 }
