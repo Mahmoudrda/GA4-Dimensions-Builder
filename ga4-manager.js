@@ -146,10 +146,6 @@ async function createAllDimensions() {
   }
 
   const checkDuplicates = document.getElementById("checkDuplicates").checked;
-  const batchSize = parseInt(document.getElementById("batchSize").value, 10);
-  const delay = parseInt(document.getElementById("delay").value, 10);
-
-  console.log('createAllDimensions: Options:', { checkDuplicates, batchSize, delay });
 
   document.getElementById("processLoader").style.display = "block";
 
